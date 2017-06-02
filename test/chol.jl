@@ -33,3 +33,23 @@
         @test chol(Hermitian(m)) ≈ chol(m_a)
     end
 end
+
+@testset "chol" begin
+    for n = (1, 2, 3, 4),
+        m in (SMatrix{n,n}, MMatrix{n,n}),
+            elty in (Float32, Float64, BigFloat, Complex64, Complex128)
+
+        a = convert(Matrix{elty}, elty <: Complex ? complex.(randn(n,n), randn(n,n)) : randn(n,n))
+        apd = a'*a
+        mapd = m(apd)
+        @test chol(mapd) ≈ chol(apd)
+        if n > 1
+            @test_throws ArgumentError chol(m(a))
+            if elty <: Real
+                @test chol(Symmetric(mapd)) ≈ chol(Symmetric(apd))
+            else
+                @test chol(Hermitian(mapd)) ≈ chol(Hermitian(mapd))
+            end
+        end
+    end
+end

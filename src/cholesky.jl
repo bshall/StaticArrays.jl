@@ -8,47 +8,38 @@ end
     _chol(Size(A), A.data)
 end
 
-@generated function _chol(::Size{(1,1)}, A::StaticMatrix)
-    @assert size(A) == (1,1)
-    T = promote_type(typeof(sqrt(one(eltype(A)))), Float32)
-    newtype = similar_type(A,T)
+@generated function _chol(::Size{s}, a::StaticMatrix{<:Any, <:Any, T}) where {s, T}
+    if s[1] != s[2]
+        error("matrix must be square")
+    end
+    n = s[1]
+    Tx = promote_type(typeof(sqrt(one(T))), Float32)
+
+    x = [i > j ? Symbol("x_0") : Symbol("x_$(i)_$(j)") for i = 1:n, j = 1:n]
+
+    code = quote x_0 = $(zero(Tx)) end
+    for k = 1:n
+        ex = :(a[$k,$k])
+        for i = 1:k-1
+            ex = :($ex - $(x[i,k])'*$(x[i,k]))
+        end
+        push!(code.args, :($(x[k,k]) = sqrt($ex)))
+        if k < n
+            push!(code.args, :(xkkInv = inv($(x[k,k])')))
+        end
+        for j = k + 1:n
+            ex = :(a[$k,$j])
+            for i = 1:k-1
+                ex = :($ex - $(x[i,k])'*$(x[i,j]))
+            end
+            ex = :($ex*xkkInv)
+            push!(code.args, :($(x[k,j]) = $ex))
+        end
+    end
 
     quote
         $(Expr(:meta, :inline))
-        ($newtype)((sqrt(A[1]), ))
+        @inbounds $code
+        @inbounds return similar_type(a, $Tx)(tuple($(x...)))
     end
 end
-
-@generated function _chol(::Size{(2,2)}, A::StaticMatrix)
-    @assert size(A) == (2,2)
-    T = promote_type(typeof(sqrt(one(eltype(A)))), Float32)
-    newtype = similar_type(A,T)
-
-    quote
-        $(Expr(:meta, :inline))
-        @inbounds a = sqrt(A[1])
-        @inbounds b = A[3] / a
-        @inbounds c = sqrt(A[4] - b'*b)
-        ($newtype)((a, $(zero(T)), b, c))
-    end
-end
-
-@generated function _chol(::Size{(3,3)}, A::StaticMatrix)
-    @assert size(A) == (3,3)
-    T = promote_type(typeof(sqrt(one(eltype(A)))), Float32)
-    newtype = similar_type(A,T)
-
-    quote
-        $(Expr(:meta, :inline))
-        @inbounds a11 = sqrt(A[1])
-        @inbounds a12 = A[4] / a11
-        @inbounds a22 = sqrt(A[5] - a12'*a12)
-        @inbounds a13 = A[7] / a11
-        @inbounds a23 = (A[8] - a12'*a13) / a22
-        @inbounds a33 = sqrt(A[9] - a13'*a13 - a23'*a23)
-        ($newtype)((a11, $(zero(T)), $(zero(T)), a12, a22, $(zero(T)), a13, a23, a33))
-    end
-end
-
-# Otherwise default algorithm returning wrapped SizedArray
-@inline _chol(s::Size, A::StaticArray) = s(full(chol(Hermitian(Array(A)))))
