@@ -61,13 +61,13 @@ end
             @test mCL.factors ≈ CL.factors
         end
     end
+end
 
-    @testset "Throw if non-Hermitian" begin
-        R = randn(4,4)
-        C = complex.(R, R)
-        for A in (R, C)
-            @test_throws ArgumentError cholfact(A)
-            @test_throws ArgumentError chol(A)
-        end
+@testset "Throw if non-Hermitian" begin
+    R = randn(4,4)
+    C = complex.(R, R)
+    for A in (R, C)
+        @test_throws ArgumentError cholfact(A)
+        @test_throws ArgumentError chol(A)
     end
 end

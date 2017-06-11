@@ -136,3 +136,21 @@ end
 
     @inbounds return ex
 end
+
+@inline Base.logdet(C::Base.LinAlg.Cholesky{<:Any,<:StaticMatrix}) = _logdet(Size(C.factors), C)
+
+@generated function _logdet(::Size{s}, C::Base.LinAlg.Cholesky{T,<:StaticMatrix}) where {s,T}
+    # TODO add following line for v0.7
+    # C.info == 0 || throw(PosDefException(C.info))
+
+    ex = :(zero(real($T)))
+    for i = 1:s[1]
+        ex = :($ex + log(real(C.factors[$i,$i])))
+    end
+    ex = :(dd = $ex)
+
+    return quote
+        @inbounds $ex
+        return dd + dd
+    end
+end
