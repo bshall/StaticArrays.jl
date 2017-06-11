@@ -33,3 +33,41 @@
         @test chol(Hermitian(m)) ≈ chol(m_a)
     end
 end
+
+@testset "Cholesky decomposition" begin
+    for n = (1, 2, 3, 4),
+        m in (SMatrix{n,n}, MMatrix{n,n}),
+            elty in (Float32, Float64, BigFloat, Complex64, Complex128)
+
+        A = convert(Matrix{elty}, (elty <: Complex ? complex.(randn(n,n), randn(n,n)) : randn(n,n)) |> t -> t't)
+        @test chol(m(A)) ≈ chol(A)
+        if elty <: Real
+            mCU = cholfact(Symmetric(m(A)))
+            CU = cholfact(Symmetric(A))
+            @test mCU.uplo == CU.uplo
+            @test mCU.factors ≈ CU.factors
+            mCL = cholfact(Symmetric(m(A), :L))
+            CL = cholfact(Symmetric(A, :L))
+            @test mCL.uplo == CL.uplo
+            @test mCL.factors ≈ CL.factors
+        else
+            mCU = cholfact(Hermitian(m(A)))
+            CU = cholfact(Hermitian(A))
+            @test mCU.uplo == CU.uplo
+            @test mCU.factors ≈ CU.factors
+            mCL = cholfact(Hermitian(m(A), :L))
+            CL = cholfact(Hermitian(A, :L))
+            @test mCL.uplo == CL.uplo
+            @test mCL.factors ≈ CL.factors
+        end
+    end
+
+    @testset "Throw if non-Hermitian" begin
+        R = randn(4,4)
+        C = complex.(R, R)
+        for A in (R, C)
+            @test_throws ArgumentError cholfact(A)
+            @test_throws ArgumentError chol(A)
+        end
+    end
+end
